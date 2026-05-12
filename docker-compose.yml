@@ -9,8 +9,10 @@ services:
     environment:
       - PORT=3000
     restart: unless-stopped
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s

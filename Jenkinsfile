@@ -51,24 +51,24 @@ pipeline {
             steps {
                 sh '''
                     echo "Waiting for service to start..."
-                    sleep 10
+                    sleep 15
 
                     echo "Running health checks..."
 
                     for i in 1 2 3 4 5
                     do
                         echo "Attempt $i"
-                        if curl -f http://localhost:4001/health; then
+                        if curl -sf http://localhost:4001/health; then
                             echo "Health check PASSED"
                             exit 0
 
                         fi
-                        echo "Attempt failed"
-                        sleep 3
+                        echo "Attempt $i failed"
+                        sleep 5
                     done
 
                     echo "Health check FAILED"
-                    docker logs kk-payments-test || true
+                    
                     exit 1
                 '''
             }
