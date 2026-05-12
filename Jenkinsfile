@@ -4,9 +4,10 @@ pipeline {
     environment {
         IMAGE_NAME = "kk-payments"
         IMAGE_TAG = "1.0.0"
+        CONTAINER_NAME = "kk-payments-test"
         PORT = "3000"
         HOST_PORT = "4001"
-        CONTAINER_NAME = "kk-payments-test"
+        HEALTH_URL = "http://localhost:4001/health"
     }
 
     stages {
@@ -19,79 +20,90 @@ pipeline {
 
         stage('Cleanup Old Container') {
             steps {
-                sh '''
-                    echo "Cleaning up old container..."
-                    docker rm -f $CONTAINER_NAME || true
-                '''
+                sh """
+                    echo "Cleaning up old container if it exists..."
+                    docker rm -f ${CONTAINER_NAME} || true
+                """
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    echo "Building image..."
-                    docker build -f app/Dockerfile.production -t $IMAGE_NAME:$IMAGE_TAG app
-                '''
+                sh """
+                    echo "Building Docker image..."
+                    docker build -f app/Dockerfile.production \
+                        -t ${IMAGE_NAME}:${IMAGE_TAG} app
+                """
             }
         }
 
         stage('Run Container') {
             steps {
-                sh '''
+                sh """
                     echo "Starting container..."
                     docker run -d \
-                        -e PORT=$PORT \
-                        -p $HOST_PORT:$PORT \
-                        --name $CONTAINER_NAME \
-                        $IMAGE_NAME:$IMAGE_TAG
+                        --name ${CONTAINER_NAME} \
+                        -e PORT=${PORT} \
+                        -p ${HOST_PORT}:${PORT} \
+                        ${IMAGE_NAME}:${IMAGE_TAG}
 
-                    echo "Waiting for container to start..."
+                    echo "Waiting for container to initialize..."
                     sleep 5
 
-                    docker ps | grep $CONTAINER_NAME
-                '''
+                    docker ps | grep ${CONTAINER_NAME}
+                """
             }
         }
 
         stage('Health Check') {
             steps {
-                sh '''
-                    echo "Starting health checks..."
+                sh """
+                    echo "Starting health check..."
 
-                    for i in 1 2 3 4 5
+                    MAX_RETRIES=10
+                    COUNT=1
+
+                    until [ \$COUNT -gt \$MAX_RETRIES ]
                     do
-                        echo "Attempt $i"
+                        echo "Attempt \$COUNT: Checking health..."
 
-                        STATUS=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
+                        STATUS_CODE=\$(curl -s -o /dev/null -w "%{http_code}" ${HEALTH_URL} || true)
 
-                        if [ "$STATUS" != "true" ]; then
-                            echo "Container is not running!"
-                            docker logs $CONTAINER_NAME
-                            exit 1
-                        fi
-
-                        if docker exec $CONTAINER_NAME curl -sf http://localhost:3000/health; then
-                            echo "Health check PASSED"
+                        if [ "\$STATUS_CODE" = "200" ]; then
+                            echo "✅ Health check PASSED"
                             exit 0
                         fi
 
-                        echo "Attempt $i failed"
+                        echo "❌ Not ready yet (status: \$STATUS_CODE)"
                         sleep 5
+                        COUNT=\$((COUNT+1))
                     done
 
-                    echo "Health check FAILED"
-                    docker logs $CONTAINER_NAME
+                    echo "❌ Health check FAILED after ${MAX_RETRIES} attempts"
+
+                    echo "---- Container logs ----"
+                    docker logs ${CONTAINER_NAME} || true
+
                     exit 1
-                '''
+                """
             }
         }
 
         stage('Logs (Debug)') {
             steps {
-                sh '''
-                    echo "Container logs:"
-                    docker logs $CONTAINER_NAME || true
-                '''
+                sh """
+                    echo "Final container logs:"
+                    docker logs ${CONTAINER_NAME} || true
+                """
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh """
+                    echo "Cleaning up container..."
+                    docker rm -f ${CONTAINER_NAME} || true
+                """
             }
         }
     }
@@ -100,17 +112,11 @@ pipeline {
         success {
             echo "Pipeline SUCCESS ✔"
         }
-
         failure {
-            echo "Pipeline FAILED ❌ - check logs above"
+            echo "Pipeline FAILED ❌"
         }
-
         always {
-            sh '''
-                echo "Cleaning up container..."
-                docker rm -f $CONTAINER_NAME || true
-            '''
-            echo "Pipeline finished"
+            echo "Pipeline completed"
         }
     }
 }
