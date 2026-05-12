@@ -5,6 +5,8 @@ pipeline {
         IMAGE_NAME = "kk-payments"
         IMAGE_TAG = "1.0.0"
         PORT = "3000"
+        HOST_PORT = "4001"
+        CONTAINER_NAME = "kk-payments-test"
     }
 
     stages {
@@ -12,6 +14,15 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Cleanup Old Container') {
+            steps {
+                sh """
+                    echo "Stopping and removing old container if it exists..."
+                    docker rm -f $CONTAINER_NAME || true
+                """
             }
         }
 
@@ -29,10 +40,10 @@ pipeline {
         stage('Run Container') {
             steps {
                 sh """
-                    docker run -d --rm \
+                    docker run -d \
                     -e PORT=$PORT \
-                    -p 4001:3000 \
-                    --name kk-payments-test \
+                    -p $HOST_PORT:$PORT \
+                    --name $CONTAINER_NAME \
                     $IMAGE_NAME:$IMAGE_TAG
                 """
             }
@@ -41,8 +52,20 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh """
-                    sleep 5
-                    curl -f http://localhost:4001/health
+                    echo "Waiting for service to start..."
+                    sleep 8
+
+                    echo "Checking health endpoint..."
+                    curl -f http://localhost:$HOST_PORT/health
+                """
+            }
+        }
+
+        stage('Logs (Debug)') {
+            steps {
+                sh """
+                    echo "Showing container logs..."
+                    docker logs $CONTAINER_NAME || true
                 """
             }
         }
@@ -50,15 +73,22 @@ pipeline {
         stage('Cleanup') {
             steps {
                 sh """
-                    docker stop kk-payments-test || true
+                    echo "Cleaning up container..."
+                    docker rm -f $CONTAINER_NAME || true
                 """
             }
         }
     }
 
     post {
+        success {
+            echo "Pipeline SUCCESS ✔"
+        }
+        failure {
+            echo "Pipeline FAILED ❌ - check logs"
+        }
         always {
-            echo 'Pipeline completed'
+            echo "Pipeline completed"
         }
     }
 }
