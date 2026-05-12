@@ -1,6 +1,6 @@
 import http, { IncomingMessage, ServerResponse } from "http";
 
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = process.env.PORT || 3000;
 
 const server = http.createServer(
   (req: IncomingMessage, res: ServerResponse) => {
