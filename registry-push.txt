@@ -1,0 +1,18 @@
+Image Registry Evidence – Week 8 Step 12
+
+Image Tag:
+felistus/kk-payments:1.0.0
+
+Build Command:
+docker build --no-cache -f app/Dockerfile.production -t kk-payments:1.0.0 app
+
+Tag Command:
+docker tag kk-payments:1.0.0 felistus/kk-payments:1.0.0
+
+Push Command:
+docker push felistus/kk-payments:1.0.0
+
+Verification:
+docker pull felistus/kk-payments:1.0.0
+docker run -d -p 4001:3000 felistus/kk-payments:1.0.0
+curl http://localhost:4001/health → {"status":"ok"}
