@@ -60,29 +60,29 @@ pipeline {
                 sh """
                     echo "Starting health check..."
 
-                    MAX_RETRIES=10
+                   retries=10
                     COUNT=1
 
-                    until [ \$COUNT -gt \$MAX_RETRIES ]
+                    until [ $count -gt $retries ]
                     do
-                        echo "Attempt \$COUNT: Checking health..."
+                        echo "Attempt $count"
 
-                        STATUS_CODE=\$(curl -s -o /dev/null -w "%{http_code}" ${HEALTH_URL} || true)
+                        code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4001/health || true)
 
-                        if [ "\$STATUS_CODE" = "200" ]; then
-                            echo "✅ Health check PASSED"
+                        if [ "$code" = "200" ]; then
+                            echo "Health check PASSED"
                             exit 0
                         fi
 
-                        echo "❌ Not ready yet (status: \$STATUS_CODE)"
+                        echo "❌ Attempt $count failed (status: $code)"
+                        count=$((count+1))
                         sleep 5
-                        COUNT=\$((COUNT+1))
                     done
 
-                    echo "❌ Health check FAILED after ${MAX_RETRIES} attempts"
+                    echo "❌ Health check FAILED after retries"
 
                     echo "---- Container logs ----"
-                    docker logs ${CONTAINER_NAME} || true
+                    docker logs kk-payments-test || true
 
                     exit 1
                 """
