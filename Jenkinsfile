@@ -81,7 +81,7 @@ pipeline {
 
                     echo "❌ Health check FAILED after retries"
 
-                    echo "---- Container logs ----"
+                    
                     docker logs kk-payments-test || true
 
                     exit 1
