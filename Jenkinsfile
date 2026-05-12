@@ -41,10 +41,11 @@ pipeline {
                     echo " Starting container..."
 
                     docker run -d \
-                        --name $CONTAINER_NAME \
-                        -e PORT=$PORT \
-                        -p $HOST_PORT:$PORT \
-                        $IMAGE_NAME:$IMAGE_TAG
+                        --name kk-payments-test \
+                        --network cicd-net \
+                        -e PORT=3000 \
+                        -p 4001:3000 \
+                        kk-payments:1.0.0
 
                     echo " Waiting for container to stabilize..."
                     sleep 8
