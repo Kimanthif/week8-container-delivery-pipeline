@@ -17,98 +17,107 @@ pipeline {
             }
         }
 
+        stage('Validate Docker') {
+            steps {
+                script {
+                    sh '''
+                        echo "Checking Docker availability..."
+                        if ! command -v docker >/dev/null 2>&1; then
+                            echo "Docker is not installed or not in PATH"
+                            exit 1
+                        fi
+
+                        docker --version || exit 1
+                    '''
+                }
+            }
+        }
+
         stage('Cleanup Old Container') {
             steps {
-                sh '''
-                    echo "Cleaning up old container..."
-                    docker rm -f $CONTAINER_NAME || true
-                '''
+                script {
+                    sh """
+                        echo "Cleaning up old container (safe mode)..."
+                        docker rm -f ${CONTAINER_NAME} || true
+                    """
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    echo "Building Docker image..."
-                    docker build -f app/Dockerfile.production -t $IMAGE_NAME:$IMAGE_TAG app
-                '''
+                script {
+                    sh """
+                        echo "Building Docker image..."
+                        docker build -f app/Dockerfile.production -t ${IMAGE_NAME}:${IMAGE_TAG} app
+                    """
+                }
             }
         }
 
         stage('Run Container') {
             steps {
-                sh '''
-                    echo "Starting container..."
-
-                    docker run -d \
-                        --name $CONTAINER_NAME \
-                        -e PORT=$PORT \
-                        -p $HOST_PORT:3000 \
-                        $IMAGE_NAME:$IMAGE_TAG
-
-                    echo "Waiting for container to start..."
-                    sleep 10
-
-                    docker ps | grep $CONTAINER_NAME || (echo "Container failed to start" && exit 1)
-                '''
+                script {
+                    sh """
+                        echo "Running container..."
+                        docker run -d \
+                          --name ${CONTAINER_NAME} \
+                          -p ${HOST_PORT}:${PORT} \
+                          ${IMAGE_NAME}:${IMAGE_TAG} || {
+                              echo "Container failed to start"
+                              docker logs ${CONTAINER_NAME} || true
+                              exit 1
+                          }
+                    """
+                }
             }
         }
 
         stage('Health Check') {
             steps {
-                sh '''
-                    echo "Running health checks..."
+                script {
+                    sh """
+                        echo "Running health check..."
+                        sleep 5
 
-                    for i in 1 2 3 4 5 6 7 8 9 10
-                    do
-                        echo "Attempt $i"
-
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                            http://localhost:$HOST_PORT/health || true)
-
-                        if [ "$STATUS" = "200" ]; then
-                            echo "Health check PASSED"
-                            exit 0
+                        if ! curl -f http://localhost:${HOST_PORT}/health; then
+                            echo "Health check failed"
+                            docker logs ${CONTAINER_NAME} || true
+                            exit 1
                         fi
-
-                        echo "Got status: $STATUS"
-                        sleep 3
-                    done
-
-                    echo "Health check FAILED"
-                    echo "Container logs:"
-                    docker logs $CONTAINER_NAME || true
-
-                    exit 1
-                '''
+                    """
+                }
             }
         }
 
         stage('Logs (Debug)') {
             steps {
-                sh '''
-                    echo "Container logs:"
-                    docker logs $CONTAINER_NAME || true
-                '''
+                script {
+                    sh """
+                        echo "Container logs:"
+                        docker logs ${CONTAINER_NAME} || true
+                    """
+                }
             }
         }
     }
 
     post {
+        always {
+            script {
+                sh """
+                    echo "Final cleanup (safe)..."
+                    docker rm -f ${CONTAINER_NAME} || true
+                """
+            }
+        }
+
         success {
-            echo "Pipeline SUCCESS ✔"
+            echo "Pipeline SUCCESS ✅"
         }
 
         failure {
-            echo "Pipeline FAILED ❌"
-        }
-
-        always {
-            sh '''
-                echo "Cleaning up container..."
-                docker rm -f $CONTAINER_NAME || true
-            '''
-            echo "Pipeline completed"
+            echo "Pipeline FAILED ❌ (check logs above)"
         }
     }
 }
