@@ -37,11 +37,12 @@ pipeline {
         stage('Run Container') {
             steps {
                 sh '''
+                    echo "Starting container..."
                     docker run -d \
-                    -e PORT=3000 \
-                    -p 4001:3000 \
-                    --name kk-payments-test \
-                    kk-payments:1.0.0
+                        -e PORT=3000 \
+                        -p 4001:3000 \
+                        --name kk-payments-test \
+                        kk-payments:1.0.0
                 '''
             }
         }
@@ -49,10 +50,10 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    echo "Waiting for service..."
+                    echo "Waiting for service to start..."
                     sleep 10
 
-                    echo "Starting health checks..."
+                    echo "Running health checks..."
 
                     for i in 1 2 3 4 5
                     do
@@ -64,7 +65,7 @@ pipeline {
                         sleep 3
                     done
 
-                    echo "Health check failed"
+                    echo "Health check FAILED"
                     docker logs kk-payments-test || true
                     exit 1
                 '''
@@ -74,7 +75,7 @@ pipeline {
         stage('Logs (Debug)') {
             steps {
                 sh '''
-                    echo "Showing container logs..."
+                    echo "Container logs:"
                     docker logs kk-payments-test || true
                 '''
             }
