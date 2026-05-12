@@ -59,8 +59,8 @@ pipeline {
                     do
                         echo "Attempt $i"
 
-                        curl -f http://localhost:4001/health && echo "Service is healthy!" && exit 0
-
+                        docker exec kk-payments-test curl -f http://localhost:3000/health && echo "Service is healthy!" && exit 0
+                        
                         echo "Attempt failed"
                         sleep 3
                     done
