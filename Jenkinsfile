@@ -52,11 +52,19 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh """
-                    echo "Waiting for service to start..."
-                    sleep 8
+                    echo "Waiting for service to stabilize..."
+                    sleep 10
 
-                    echo "Checking health endpoint..."
-                    curl -f http://localhost:$HOST_PORT/health
+                    echo "Retrying health check..."
+                    for i in 1 2 3 4 5; do
+                        curl -f http://localhost:4001/health && exit 0
+                        echo "Attempt $i failed, retrying..."
+                        sleep 3
+                    
+                    done
+
+                    echo "Health check failed"
+                    exit 1
                 """
             }
         }
