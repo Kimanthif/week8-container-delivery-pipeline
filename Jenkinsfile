@@ -4,9 +4,9 @@ pipeline {
     environment {
         IMAGE_NAME = "kk-payments"
         IMAGE_TAG = "1.0.0"
-        CONTAINER_NAME = "kk-payments-test"
+        PORT = "3000"
         HOST_PORT = "4001"
-        CONTAINER_PORT = "3000"
+        CONTAINER_NAME = "kk-payments-test"
     }
 
     stages {
@@ -17,29 +17,18 @@ pipeline {
             }
         }
 
-        stage('Validate Docker') {
-            steps {
-                sh '''
-                    echo "Checking Docker..."
-                    docker --version
-                    docker ps
-                '''
-            }
-        }
-
         stage('Cleanup Old Container') {
             steps {
                 sh '''
-                    echo "Removing old container if it exists..."
+                    echo "Stopping and removing old container if it exists..."
                     docker rm -f kk-payments-test || true
                 '''
             }
         }
 
-        stage('Build Image') {
+        stage('Build Docker Image') {
             steps {
                 sh '''
-                    echo "Building Docker image..."
                     docker build -f app/Dockerfile.production -t kk-payments:1.0.0 app
                 '''
             }
@@ -50,8 +39,9 @@ pipeline {
                 sh '''
                     echo "Starting container..."
                     docker run -d \
-                        --name kk-payments-test \
+                        -e PORT=3000 \
                         -p 4001:3000 \
+                        --name kk-payments-test \
                         kk-payments:1.0.0
                 '''
             }
@@ -60,16 +50,31 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    echo "Skipping health check (dev mode)"
+                    echo "Waiting for service to start..."
+                    sleep 15
 
-                   
+                    echo "Running health checks..."
+
+                    for i in 1 2 3 4 5
+                    do
+                        echo "Attempt $i"
+                        if curl -sf http://localhost:4001/health; then
+                            echo "Health check PASSED"
                             exit 0
-                        
+
+                        fi
+                        echo "Attempt $i failed"
+                        sleep 5
+                    done
+
+                    echo "Health check FAILED"
+                    
+                    exit 1
                 '''
             }
         }
 
-        stage('Logs') {
+        stage('Logs (Debug)') {
             steps {
                 sh '''
                     echo "Container logs:"
@@ -77,22 +82,26 @@ pipeline {
                 '''
             }
         }
+
+        stage('Cleanup') {
+            steps {
+                sh '''
+                    echo "Cleaning up container..."
+                    docker rm -f kk-payments-test || true
+                '''
+            }
+        }
     }
 
     post {
-        always {
-            sh '''
-                echo "Final cleanup..."
-                docker rm -f kk-payments-test || true
-            '''
-        }
-
         success {
-            echo "Pipeline SUCCESS ✅"
+            echo "Pipeline SUCCESS ✔"
         }
-
         failure {
-            echo "Pipeline FAILED ❌ (check logs above)"
+            echo "Pipeline FAILED ❌"
+        }
+        always {
+            echo "Pipeline completed"
         }
     }
 }
