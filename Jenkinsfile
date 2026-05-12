@@ -56,13 +56,10 @@ pipeline {
                     sleep 10
 
                     
+                    echo "Retrying health check..."
                     for i in 1 2 3 4 5; do
-                        echo "Attempt $i"
-                        if curl -f http://localhost:$HOST_PORT/health; then
-                            echo "Health check passed"
-                            exit 0
-                        
-                        fi
+                        curl -f http://localhost:$HOST_PORT/health && exit 0
+                        echo "Attempt \$i failed"
                         sleep 3
                     
                     done
