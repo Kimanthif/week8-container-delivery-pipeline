@@ -58,7 +58,7 @@ pipeline {
                     echo "Retrying health check..."
                     for i in 1 2 3 4 5; do
                         curl -f http://localhost:4001/health && exit 0
-                        echo "Attempt $i failed, retrying..."
+                        echo "Attempt \$i failed, retrying..."
                         sleep 3
                     
                     done
