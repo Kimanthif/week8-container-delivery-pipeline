@@ -58,9 +58,11 @@ pipeline {
                     for i in 1 2 3 4 5
                     do
                         echo "Attempt $i"
+                        if curl -f http://localhost:4001/health; then
+                            echo "Health check PASSED"
+                            exit 0
 
-                        docker exec kk-payments-test curl -f http://localhost:3000/health && echo "Service is healthy!" && exit 0
-                        
+                        fi
                         echo "Attempt failed"
                         sleep 3
                     done
