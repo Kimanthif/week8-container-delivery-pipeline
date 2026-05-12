@@ -19,73 +19,73 @@ pipeline {
 
         stage('Cleanup Old Container') {
             steps {
-                sh """
+                sh '''
                     echo "Stopping and removing old container if it exists..."
-                    docker rm -f $CONTAINER_NAME || true
-                """
+                    docker rm -f kk-payments-test || true
+                '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                    docker build \
-                    -f app/Dockerfile.production \
-                    -t $IMAGE_NAME:$IMAGE_TAG \
-                    app
-                """
+                sh '''
+                    docker build -f app/Dockerfile.production -t kk-payments:1.0.0 app
+                '''
             }
         }
 
         stage('Run Container') {
             steps {
-                sh """
+                sh '''
                     docker run -d \
-                    -e PORT=$PORT \
-                    -p $HOST_PORT:$PORT \
-                    --name $CONTAINER_NAME \
-                    $IMAGE_NAME:$IMAGE_TAG
-                """
+                    -e PORT=3000 \
+                    -p 4001:3000 \
+                    --name kk-payments-test \
+                    kk-payments:1.0.0
+                '''
             }
         }
 
         stage('Health Check') {
             steps {
-                sh """
-                    echo "Waiting for service ..."
+                sh '''
+                    echo "Waiting for service..."
                     sleep 10
 
-                    
-                    echo "Retrying health check..."
-                    for i in 1 2 3 4 5; do
-                        curl -f http://localhost:4001/health && exit 0
-                        echo "Attempt $i failed"
+                    echo "Starting health checks..."
+
+                    for i in 1 2 3 4 5
+                    do
+                        echo "Attempt $i"
+
+                        curl -f http://localhost:4001/health && echo "Service is healthy!" && exit 0
+
+                        echo "Attempt failed"
                         sleep 3
-                    
                     done
 
                     echo "Health check failed"
-                    docker logs $CONTAINER_NAME || true
+                    docker logs kk-payments-test || true
                     exit 1
-                """
+                '''
             }
         }
 
         stage('Logs (Debug)') {
             steps {
-                sh """
+                sh '''
                     echo "Showing container logs..."
-                    docker logs $CONTAINER_NAME || true
-                """
+                    docker logs kk-payments-test || true
+                '''
             }
         }
 
         stage('Cleanup') {
             steps {
-                sh """
+                sh '''
                     echo "Cleaning up container..."
-                    docker rm -f $CONTAINER_NAME || true
-                """
+                    docker rm -f kk-payments-test || true
+                '''
             }
         }
     }
@@ -95,7 +95,7 @@ pipeline {
             echo "Pipeline SUCCESS ✔"
         }
         failure {
-            echo "Pipeline FAILED ❌ - check logs"
+            echo "Pipeline FAILED ❌"
         }
         always {
             echo "Pipeline completed"
