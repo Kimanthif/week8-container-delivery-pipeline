@@ -1,0 +1,47 @@
+# =============================
+# 1. Builder stage
+# =============================
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy source code
+COPY tsconfig.json ./
+COPY src ./src
+
+# Build TypeScript -> dist/
+RUN npm run build
+
+# =============================
+# 2. Production stage
+# =============================
+FROM node:18-alpine AS production
+
+WORKDIR /app
+
+# Create non-root user "kijani"
+RUN addgroup -S kijani && adduser -S kijani -G kijani
+
+# Only copy runtime files (NOT node_modules from builder)
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+# Copy final built JS from builder
+COPY --from=builder /app/dist ./dist
+
+# Switch to non-root user
+USER kijani
+
+# Expose port
+EXPOSE 3000
+
+# Healthcheck (60s timeout)
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+
+# Entrypoint
+CMD ["node", "dist/index.js"]
