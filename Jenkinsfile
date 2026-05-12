@@ -4,10 +4,9 @@ pipeline {
     environment {
         IMAGE_NAME = "kk-payments"
         IMAGE_TAG = "1.0.0"
-        CONTAINER_NAME = "kk-payments-test"
         PORT = "3000"
         HOST_PORT = "4001"
-        HEALTH_URL = "http://localhost:4001/health"
+        CONTAINER_NAME = "kk-payments-test"
     }
 
     stages {
@@ -20,103 +19,93 @@ pipeline {
 
         stage('Cleanup Old Container') {
             steps {
-                sh """
-                    echo "Cleaning up old container if it exists..."
-                    docker rm -f ${CONTAINER_NAME} || true
-                """
+                sh '''
+                    echo " Cleaning up old container..."
+                    docker rm -f $CONTAINER_NAME || true
+                '''
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh """
-                    echo "Building Docker image..."
-                    docker build -f app/Dockerfile.production \
-                        -t ${IMAGE_NAME}:${IMAGE_TAG} app
-                """
+                sh '''
+                    echo "🐳 Building Docker image..."
+                    docker build -f app/Dockerfile.production -t $IMAGE_NAME:$IMAGE_TAG app
+                '''
             }
         }
 
         stage('Run Container') {
             steps {
-                sh """
-                    echo "Starting container..."
+                sh '''
+                    echo " Starting container..."
+
                     docker run -d \
-                        --name ${CONTAINER_NAME} \
-                        -e PORT=${PORT} \
-                        -p ${HOST_PORT}:${PORT} \
-                        ${IMAGE_NAME}:${IMAGE_TAG}
+                        --name $CONTAINER_NAME \
+                        -e PORT=$PORT \
+                        -p $HOST_PORT:$PORT \
+                        $IMAGE_NAME:$IMAGE_TAG
 
-                    echo "Waiting for container to initialize..."
-                    sleep 5
+                    echo " Waiting for container to stabilize..."
+                    sleep 8
 
-                    docker ps | grep ${CONTAINER_NAME}
-                """
+                    docker ps | grep $CONTAINER_NAME || (echo "Container failed to start" && exit 1)
+                '''
             }
         }
 
-        stage('Health Check') {
+        stage('Health Check (Final Boss Mode)') {
             steps {
-                sh """
-                    echo "Starting health check..."
+                sh '''
+                    echo " Running health checks..."
 
-                   retries=10
-                    COUNT=1
-
-                    until [ $count -gt $retries ]
+                    for i in 1 2 3 4 5 6 7 8 9 10
                     do
-                        echo "Attempt $count"
+                        echo "Attempt $i"
 
-                        code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4001/health || true)
+                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:$HOST_PORT/health || true)
 
-                        if [ "$code" = "200" ]; then
-                            echo "Health check PASSED"
+                        if [ "$STATUS" = "200" ]; then
+                            echo "✅ Health check PASSED"
                             exit 0
                         fi
 
-                        echo "❌ Attempt $count failed (status: $code)"
-                        count=$((count+1))
-                        sleep 5
+                        echo "❌ Got status: $STATUS"
+                        sleep 3
                     done
 
-                    echo "❌ Health check FAILED after retries"
-
-                    
-                    docker logs kk-payments-test || true
+                    echo " Health check FAILED"
+                    echo " Container logs:"
+                    docker logs $CONTAINER_NAME || true
 
                     exit 1
-                """
+                '''
             }
         }
 
         stage('Logs (Debug)') {
             steps {
-                sh """
-                    echo "Final container logs:"
-                    docker logs ${CONTAINER_NAME} || true
-                """
-            }
-        }
-
-        stage('Cleanup') {
-            steps {
-                sh """
-                    echo "Cleaning up container..."
-                    docker rm -f ${CONTAINER_NAME} || true
-                """
+                sh '''
+                    echo " Final container logs:"
+                    docker logs $CONTAINER_NAME || true
+                '''
             }
         }
     }
 
     post {
         success {
-            echo "Pipeline SUCCESS ✔"
+            echo " Pipeline SUCCESS ✔"
         }
         failure {
-            echo "Pipeline FAILED ❌"
+            echo " Pipeline FAILED ❌"
         }
         always {
-            echo "Pipeline completed"
+            sh '''
+                echo " Final cleanup..."
+                docker rm -f $CONTAINER_NAME || true
+            '''
+            echo "Pipeline finished"
         }
     }
 }
