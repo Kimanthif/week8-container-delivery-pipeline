@@ -65,7 +65,7 @@ pipeline {
                     for i in $(seq 1 20); do
                         echo "Attempt $i..."
 
-                        if curl -sf http://localhost:4001; then
+                        if curl -sf http://localhost:4001/health; then
                             echo "Service is UP ✅"
                             exit 0
                         fi
