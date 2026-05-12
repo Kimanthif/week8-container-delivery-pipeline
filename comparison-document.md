@@ -44,6 +44,3 @@ However, Week 8 does not fully solve higher-level production concerns. Observabi
 
 Overall, Week 8 represents a clear architectural upgrade from Week 7, shifting from container management to container orchestration, and establishing a foundation closer to production-grade CI/CD systems.
 
-Screenshots
-
-![health check](screenshots/health-check-week8.png)
