@@ -43,7 +43,6 @@ pipeline {
                     docker run -d \
                     -e PORT=$PORT \
                     -p $HOST_PORT:$PORT \
-                    --network host \
                     --name $CONTAINER_NAME \
                     $IMAGE_NAME:$IMAGE_TAG
                 """
@@ -53,13 +52,17 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh """
-                    echo "Waiting for service to stabilize..."
+                    echo "Waiting for service ..."
                     sleep 10
 
                     
                     for i in 1 2 3 4 5; do
-                        curl -f http://localhost:4001/health && exit 0
-                        echo "Attempt \$i failed"
+                        echo "Attempt $i"
+                        if curl -f http://localhost:$HOST_PORT/health; then
+                            echo "Health check passed"
+                            exit 0
+                        
+                        fi
                         sleep 3
                     
                     done
