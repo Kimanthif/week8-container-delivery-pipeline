@@ -58,7 +58,7 @@ pipeline {
                     
                     echo "Retrying health check..."
                     for i in 1 2 3 4 5; do
-                        curl -f http://localhost:3000/health && exit 0
+                        docker exec $CONTAINER_NAME curl -f http://localhost:3000/health && exit 0
                         echo "Attempt \$i failed"
                         sleep 3
                     
