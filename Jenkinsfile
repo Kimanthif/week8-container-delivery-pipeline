@@ -20,8 +20,8 @@ pipeline {
         stage('Cleanup Old Container') {
             steps {
                 sh '''
-                    echo "Stopping and removing old container if it exists..."
-                    docker rm -f kk-payments-test || true
+                    echo "Cleaning up old container..."
+                    docker rm -f $CONTAINER_NAME || true
                 '''
             }
         }
@@ -29,7 +29,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 sh '''
-                    docker build -f app/Dockerfile.production -t kk-payments:1.0.0 app
+                    echo "Building image..."
+                    docker build -f app/Dockerfile.production -t $IMAGE_NAME:$IMAGE_TAG app
                 '''
             }
         }
@@ -39,10 +40,15 @@ pipeline {
                 sh '''
                     echo "Starting container..."
                     docker run -d \
-                        -e PORT=3000 \
-                        -p 4001:3000 \
-                        --name kk-payments-test \
-                        kk-payments:1.0.0
+                        -e PORT=$PORT \
+                        -p $HOST_PORT:$PORT \
+                        --name $CONTAINER_NAME \
+                        $IMAGE_NAME:$IMAGE_TAG
+
+                    echo "Waiting for container to start..."
+                    sleep 5
+
+                    docker ps | grep $CONTAINER_NAME
                 '''
             }
         }
@@ -50,25 +56,31 @@ pipeline {
         stage('Health Check') {
             steps {
                 sh '''
-                    echo "Waiting for service to start..."
-                    sleep 15
-
-                    echo "Running health checks..."
+                    echo "Starting health checks..."
 
                     for i in 1 2 3 4 5
                     do
                         echo "Attempt $i"
-                        if curl -sf http://localhost:4001/health; then
+
+                        STATUS=$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)
+
+                        if [ "$STATUS" != "true" ]; then
+                            echo "Container is not running!"
+                            docker logs $CONTAINER_NAME
+                            exit 1
+                        fi
+
+                        if docker exec $CONTAINER_NAME curl -sf http://localhost:3000/health; then
                             echo "Health check PASSED"
                             exit 0
-
                         fi
+
                         echo "Attempt $i failed"
                         sleep 5
                     done
 
                     echo "Health check FAILED"
-                    
+                    docker logs $CONTAINER_NAME
                     exit 1
                 '''
             }
@@ -78,16 +90,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Container logs:"
-                    docker logs kk-payments-test || true
-                '''
-            }
-        }
-
-        stage('Cleanup') {
-            steps {
-                sh '''
-                    echo "Cleaning up container..."
-                    docker rm -f kk-payments-test || true
+                    docker logs $CONTAINER_NAME || true
                 '''
             }
         }
@@ -97,11 +100,17 @@ pipeline {
         success {
             echo "Pipeline SUCCESS ✔"
         }
+
         failure {
-            echo "Pipeline FAILED ❌"
+            echo "Pipeline FAILED ❌ - check logs above"
         }
+
         always {
-            echo "Pipeline completed"
+            sh '''
+                echo "Cleaning up container..."
+                docker rm -f $CONTAINER_NAME || true
+            '''
+            echo "Pipeline finished"
         }
     }
 }
